@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Playwright/ブラウザキャッシュ
+.playwright/
+playwright/.cache/
+
+# OSごみ
+.DS_Store
+Thumbs.db
