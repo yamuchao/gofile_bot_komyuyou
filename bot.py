@@ -8,6 +8,9 @@ from dateutil import tz
 import tweepy
 from playwright.sync_api import sync_playwright
 
+import requests
+from requests_oauthlib import OAuth1  # ★追加：OAuth1 署名
+
 from goxplorer import collect_fresh_gofile_urls, is_gofile_alive
 
 # ===== 設定 =====
@@ -198,19 +201,26 @@ def fetch_recent_urls_via_web(username: str, scrolls: int = 3, wait_ms: int = 10
 
 # --- コミュニティ投稿（/2/tweets に community_id を渡す） ---
 # Tweepy 4.14.0 の create_tweet は community_id を直接受けないため、
-# 認証付きの requests.Session（client.session）で生POSTします（★auth=client.auth が重要）。
-def post_to_x_community(client: tweepy.Client, status_text: str, community_id: str, share_with_followers: bool):
-    url = "https://api.x.com/2/tweets"  # どちらでも可: https://api.twitter.com/2/tweets
+# OAuth1署名を付けて requests で生POSTします。
+def post_to_x_community(status_text: str, community_id: str, share_with_followers: bool):
+    url = "https://api.twitter.com/2/tweets"  # または https://api.x.com/2/tweets
     payload = {
         "text": status_text,
         "community_id": community_id,
         "share_with_followers": bool(str(share_with_followers).lower() in ("1", "true", "yes"))
     }
-    resp = client.session.post(url, json=payload, timeout=30, auth=client.auth)
+    # OAuth1 署名（Secrets から直接）
+    auth = OAuth1(
+        os.environ["X_API_KEY"],
+        os.environ["X_API_SECRET"],
+        os.environ["X_ACCESS_TOKEN"],
+        os.environ["X_ACCESS_TOKEN_SECRET"],
+        decoding=None,  # Py3での署名エンコードを安定させる
+    )
+    resp = requests.post(url, json=payload, timeout=30, auth=auth)
     try:
         resp.raise_for_status()
     except Exception:
-        # デバッグ用に本文を表示（Secretsは含まれない）
         print("[debug] status=", resp.status_code)
         try:
             print("[debug] body=", resp.text)
@@ -327,7 +337,7 @@ def main():
     share_flag = os.getenv("X_SHARE_WITH_FOLLOWERS", "false")
     try:
         if community_id:
-            resp = post_to_x_community(client, status_text, community_id, share_flag)
+            resp = post_to_x_community(status_text, community_id, share_flag)
             tweet_id = (resp.get("data") or {}).get("id")
             print(f"[info] posted to community id={community_id} tweet_id={tweet_id}")
         else:
@@ -364,7 +374,7 @@ def main():
             time.sleep(1.0)
             try:
                 if community_id:
-                    resp = post_to_x_community(client, status_text, community_id, share_flag)
+                    resp = post_to_x_community(status_text, community_id, share_flag)
                     tweet_id = (resp.get("data") or {}).get("id")
                 else:
                     resp = post_to_x_standard(client, status_text)
