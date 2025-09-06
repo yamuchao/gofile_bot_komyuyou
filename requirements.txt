@@ -1,0 +1,6 @@
+tweepy==4.14.0
+requests==2.32.3
+beautifulsoup4==4.12.3
+python-dateutil==2.9.0.post0
+cloudscraper==1.2.71
+playwright==1.47.0
