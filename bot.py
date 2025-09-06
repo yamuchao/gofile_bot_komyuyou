@@ -198,17 +198,25 @@ def fetch_recent_urls_via_web(username: str, scrolls: int = 3, wait_ms: int = 10
 
 # --- コミュニティ投稿（/2/tweets に community_id を渡す） ---
 # Tweepy 4.14.0 の create_tweet は community_id を直接受けないため、
-# 認証付きの requests.Session（client.session）で生POSTします。
+# 認証付きの requests.Session（client.session）で生POSTします（★auth=client.auth が重要）。
 def post_to_x_community(client: tweepy.Client, status_text: str, community_id: str, share_with_followers: bool):
-    import json as _json
-    url = "https://api.x.com/2/tweets"
+    url = "https://api.x.com/2/tweets"  # どちらでも可: https://api.twitter.com/2/tweets
     payload = {
         "text": status_text,
         "community_id": community_id,
         "share_with_followers": bool(str(share_with_followers).lower() in ("1", "true", "yes"))
     }
-    resp = client.session.post(url, json=payload, timeout=30)
-    resp.raise_for_status()
+    resp = client.session.post(url, json=payload, timeout=30, auth=client.auth)
+    try:
+        resp.raise_for_status()
+    except Exception:
+        # デバッグ用に本文を表示（Secretsは含まれない）
+        print("[debug] status=", resp.status_code)
+        try:
+            print("[debug] body=", resp.text)
+        except Exception:
+            pass
+        raise
     return resp.json()
 
 def post_to_x_standard(client, status_text: str):
